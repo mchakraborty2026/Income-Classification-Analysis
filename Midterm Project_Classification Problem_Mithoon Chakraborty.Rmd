@@ -1,0 +1,520 @@
+---
+title: "Midterm Project (Classification Problem)"
+author: "Mithoon Chakraborty"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Loading Dataset
+```{r}
+adult <- read.table(
+  "adult.data",
+  sep = ",",
+  header = FALSE,
+  strip.white = TRUE,
+  stringsAsFactors = FALSE,
+  colClasses = "character"
+)
+
+colnames(adult) <- c(
+  "age", "workclass", "fnlwgt", "education", "education_num",
+  "marital_status", "occupation", "relationship", "race", "sex",
+  "capital_gain", "capital_loss", "hours_per_week", "native_country", "income"
+)
+
+dim(adult)
+head(adult)
+```
+
+# 2. Data Preprocessing & Exploration
+## 2.1 Exploratory Data Analysis
+```{r}
+# view raw data
+summary(adult)
+# checking structure
+str(adult)
+# variable distribution
+table(adult$income)
+prop.table(table(adult$income))
+
+# Income Class Distribution
+barplot(table(adult$income),
+        main = "Income Class Distribution",
+        xlab = "Income Category",
+        ylab = "Frequency",
+        col = c("lightblue", "lightgreen"))
+
+# Frequency tables (categorical variables)
+table(adult$workclass)
+table(adult$education)
+table(adult$marital_status)
+table(adult$occupation)
+table(adult$relationship)
+table(adult$race)
+table(adult$sex)
+table(adult$native_country)
+table(adult$income)
+# Histograms (numeric variables)
+hist(as.numeric(adult$age), main = "Age Distribution", xlab = "Age")
+
+hist(as.numeric(adult$fnlwgt), main = "Fnlwgt Distribution", xlab = "Fnlwgt")
+
+hist(as.numeric(adult$education_num), main = "Education Num Distribution", xlab = "Education Num")
+
+hist(as.numeric(adult$capital_gain), main = "Capital Gain Distribution", xlab = "Capital Gain")
+
+hist(as.numeric(adult$capital_loss), main = "Capital Loss Distribution", xlab = "Capital Loss")
+
+hist(as.numeric(adult$hours_per_week), main = "Hours per Week Distribution", xlab = "Hours")
+
+# Numeric Summary 
+numeric_data <- adult[, c("age","fnlwgt","education_num","capital_gain","capital_loss","hours_per_week")]
+
+data.frame(
+  Variable = names(numeric_data),
+  Mean = sapply(numeric_data, function(x) mean(as.numeric(x))),
+  Median = sapply(numeric_data, function(x) median(as.numeric(x))),
+  Min = sapply(numeric_data, function(x) min(as.numeric(x))),
+  Max = sapply(numeric_data, function(x) max(as.numeric(x)))
+)
+
+# corelation matrix
+numeric_data2 <- data.frame(lapply(numeric_data, as.numeric))
+round(cor(numeric_data2), 2)
+
+# Bar plots (categorical variables)
+barplot(table(adult$income), main = "Income Distribution")
+
+barplot(table(adult$sex), main = "Sex Distribution")
+
+barplot(table(adult$workclass), main = "Workclass Distribution")
+
+barplot(table(adult$education), main = "Education Distribution")
+
+# Boxplots for Outlier Detection
+boxplot(as.numeric(adult$age), main = "Boxplot of Age")
+
+boxplot(as.numeric(adult$fnlwgt), main = "Boxplot of Fnlwgt")
+
+boxplot(as.numeric(adult$capital_gain), main = "Boxplot of Capital Gain")
+
+boxplot(as.numeric(adult$capital_loss), main = "Boxplot of Capital Loss")
+
+boxplot(as.numeric(adult$hours_per_week), main = "Boxplot of Hours per Week")
+
+
+# Missing value distribution
+colSums(adult == "?")
+
+```
+## 2.2 Data Preprocessing
+### 2.2.1 Handling Missing Value
+```{r}
+# Count missing values
+colSums(adult == "?")
+# Store missing counts
+missing_counts <- colSums(adult == "?")
+# Missing Percentage
+missing_percent <- missing_counts / nrow(adult) * 100
+missing_percent
+# Convert missing value to NA
+adult[adult == "?"] <- NA
+# Verify missing value
+colSums(is.na(adult))
+# Cleaning missing value
+adult_clean <- na.omit(adult)
+# Compare dataset size before and after cleaning
+dim(adult)
+dim(adult_clean)
+# Number of rows removed
+rows_removed <- nrow(adult) - nrow(adult_clean)
+rows_removed
+```
+### 2.2.2 Handling Outliers
+```{r}
+# Outlier Handling Decision
+# Outliers identified during EDA
+# No removal performed
+# Boxplot for Outlier Detection
+boxplot(as.numeric(adult_clean$capital_gain),
+        main = "Boxplot of Capital Gain",
+        col = "lightgreen")
+boxplot(as.numeric(adult_clean$capital_loss),
+        main = "Boxplot of Capital Loss",
+        col = "lightblue")
+```
+### 2.2.3 Data Transformation
+```{r}
+# Convert numeric variables
+adult_clean$age <- as.numeric(adult_clean$age)
+adult_clean$fnlwgt <- as.numeric(adult_clean$fnlwgt)
+adult_clean$education_num <- as.numeric(adult_clean$education_num)
+adult_clean$capital_gain <- as.numeric(adult_clean$capital_gain)
+adult_clean$capital_loss <- as.numeric(adult_clean$capital_loss)
+adult_clean$hours_per_week <- as.numeric(adult_clean$hours_per_week)
+
+# Convert categorical variables
+factor_cols <- c(
+  "workclass", "education", "marital_status", "occupation",
+  "relationship", "race", "sex", "native_country", "income"
+)
+adult_clean[factor_cols] <- lapply(adult_clean[factor_cols], as.factor)
+
+# Verify Data Types
+str(adult_clean)
+
+# Handle Skewness using Log Transformation
+adult_clean$capital_gain_log <- log1p(adult_clean$capital_gain)
+adult_clean$capital_loss_log <- log1p(adult_clean$capital_loss)
+adult_clean$fnlwgt_log <- log1p(adult_clean$fnlwgt)
+
+```
+## 2.3 Relationship Visualization
+```{r}
+# Age vs Income
+boxplot(as.numeric(age) ~ income, data = adult_clean,
+        main = "Age vs Income", xlab = "Income", ylab = "Age")
+
+# Hours per week vs Income
+boxplot(as.numeric(hours_per_week) ~ income, data = adult_clean,
+        main = "Hours per Week vs Income", xlab = "Income", ylab = "Hours")
+
+# Education vs Income
+prop.table(table(adult_clean$education, adult_clean$income), 1)
+
+# Sex vs Income
+prop.table(table(adult_clean$sex, adult_clean$income), 1)
+
+# Occupation vs Income
+table(adult_clean$occupation, adult_clean$income)
+```
+# 3. Model Development: 
+## 3.1 Preparing The modeling dataset
+```{r}
+# Final Modeling Dataset Check
+str(adult_clean)
+summary(adult_clean)
+
+# Target Variable Check
+table(adult_clean$income)
+prop.table(table(adult_clean$income))
+```
+
+## 3.2 Split the dataset
+```{r}
+# Training and Validation Split
+set.seed(123)
+
+train_index <- sample(1:nrow(adult_clean), 0.7 * nrow(adult_clean))
+
+train_data <- adult_clean[train_index, ]
+valid_data <- adult_clean[-train_index, ]
+
+dim(train_data)
+dim(valid_data)
+
+```
+
+## 3.3 Choose predictor variables
+```{r}
+income ~ age + workclass + education + education_num + marital_status +
+occupation + relationship + race + sex + capital_gain + capital_loss +
+hours_per_week + native_country
+```
+
+## 3.4 Model 1 — Logistic Regression
+```{r}
+# Logistic Regression Model using resampling
+library(caret)
+ctrl <- trainControl(method = "boot", number = 25)
+
+# Logistic Regression Model
+log_model <- train(
+  income ~ age + workclass + education + education_num + marital_status +
+    occupation + relationship + race + sex + capital_gain + capital_loss +
+    hours_per_week + native_country,
+  data = train_data,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl
+)
+
+log_model
+
+# Coefficient Table
+coef_table <- round(summary(log_model$finalModel)$coefficients, 4)
+coef_table
+
+# Show only significant variables
+coef_table[coef_table[,4] < 0.05, ]
+
+# Pseudo R²
+pseudo_r2 <- 1 - (log_model$finalModel$deviance / log_model$finalModel$null.deviance)
+round(pseudo_r2, 4)
+
+# AIC
+log_model$finalModel$aic
+
+# Predictions
+log_pred <- predict(log_model, newdata = valid_data)
+
+# Confusion Matrix
+cm_log <- confusionMatrix(log_pred, valid_data$income)
+cm_log
+
+# Accuracy
+log_accuracy <- round(cm_log$overall["Accuracy"], 4)
+log_accuracy
+
+# Precision
+log_precision <- round(cm_log$byClass["Pos Pred Value"], 4)
+log_precision
+
+# Recall
+log_recall <- round(cm_log$byClass["Sensitivity"], 4)
+log_recall
+
+# F1 Score
+log_f1 <- round(2 * (log_precision * log_recall) / (log_precision + log_recall), 4)
+log_f1
+```
+
+## 3.5 Model 2 — Linear Discriminant Analysis
+```{r}
+# LDA Model using caret
+library(caret)
+
+lda_model <- train(
+  income ~ age + workclass + education + marital_status + occupation +
+    relationship + race + sex + capital_gain + capital_loss +
+    hours_per_week + native_country,
+  data = train_data,
+  method = "lda"
+)
+
+lda_model
+
+# LDA model Prediction
+lda_pred <- predict(lda_model, newdata = valid_data)
+
+# LDA model confusion matrix
+cm_lda <- confusionMatrix(lda_pred, valid_data$income)
+cm_lda
+
+# Accuracy
+lda_accuracy <- round(cm_lda$overall["Accuracy"], 4)
+lda_accuracy
+
+# Precision
+lda_precision <- round(cm_lda$byClass["Pos Pred Value"], 4)
+lda_precision
+
+# Recall
+lda_recall <- round(cm_lda$byClass["Sensitivity"], 4)
+lda_recall
+
+# F1 Score
+lda_f1 <- round(2 * (lda_precision * lda_recall) / (lda_precision + lda_recall), 4)
+lda_f1
+```
+## 3.6 Model 3 — Decission Tree
+```{r}
+library(caret)
+
+# Decision Tree Model using caret
+tree_model <- train(
+  income ~ age + workclass + education + marital_status +
+    occupation + relationship + race + sex + capital_gain + capital_loss +
+    hours_per_week + native_country,
+  data = train_data,
+  method = "rpart"
+)
+
+tree_model
+
+# Decision Tree Prediction
+tree_pred <- predict(tree_model, newdata = valid_data)
+
+# Decision Tree confusion matrix
+cm_tree <- confusionMatrix(tree_pred, valid_data$income)
+cm_tree
+
+# Accuracy
+tree_accuracy <- round(cm_tree$overall["Accuracy"], 4)
+tree_accuracy
+
+# Precision
+tree_precision <- round(cm_tree$byClass["Pos Pred Value"], 4)
+tree_precision
+
+# Recall
+tree_recall <- round(cm_tree$byClass["Sensitivity"], 4)
+tree_recall
+
+# F1 Score
+tree_f1 <- round(2 * (tree_precision * tree_recall) / (tree_precision + tree_recall), 4)
+tree_f1
+```
+## 3.7 Model Comparison
+```{r}
+model_comparison <- data.frame(
+  Model = c("Logistic Regression", "LDA", "Decision Tree"),
+  Accuracy = c(log_accuracy, lda_accuracy, tree_accuracy),
+  Precision = c(log_precision, lda_precision, tree_precision),
+  Recall = c(log_recall, lda_recall, tree_recall),
+  F1_Score = c(log_f1, lda_f1, tree_f1)
+)
+
+knitr::kable(model_comparison, caption = "Model Comparison on Validation Data")
+```
+# 4. Performance Metrics and Testing Selected Logistic Model on Test Data set
+## 4.1 Model Performance Metrics on Validation Data
+```{r}
+# Final Model Performance (Validation Set)
+library(caret)
+
+# Predictions
+val_pred <- predict(log_model, newdata = valid_data)
+
+# Confusion Matrix (Full metrics)
+conf_matrix <- confusionMatrix(val_pred, valid_data$income)
+conf_matrix
+
+# Accuracy
+val_accuracy <- round(conf_matrix$overall["Accuracy"], 4)
+val_accuracy
+
+# Precision
+val_precision <- round(conf_matrix$byClass["Pos Pred Value"], 4)
+val_precision
+
+# Recall (Sensitivity)
+val_recall <- round(conf_matrix$byClass["Sensitivity"], 4)
+val_recall
+
+# F1 Score
+val_f1 <- round(2 * (val_precision * val_recall) / (val_precision + val_recall), 4)
+val_f1
+
+# Combine all metrics in one table
+performance_metrics <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall", "F1 Score"),
+  Value = c(val_accuracy, val_precision, val_recall, val_f1)
+)
+
+performance_metrics
+```
+## 4.2 Model Performance Metrics on Test Data
+### 4.2.1 LoadTest Dataset and Preprocessing
+```{r}
+
+# Load Test Dataset
+
+adult_test <- read.table(
+  "adult.test",
+  sep = ",",
+  header = FALSE,
+  strip.white = TRUE,
+  stringsAsFactors = FALSE,
+  colClasses = "character",
+  skip = 1
+)
+
+colnames(adult_test) <- colnames(adult)
+
+
+# Clean Test Dataset
+# Remove "." from income labels
+adult_test$income <- gsub("\\.", "", adult_test$income)
+
+# Convert "?" to NA
+adult_test[adult_test == "?"] <- NA
+
+# Remove missing values
+adult_test_clean <- na.omit(adult_test)
+
+# Match Data Types with Training Data
+
+
+# Numeric variables
+adult_test_clean$age <- as.numeric(adult_test_clean$age)
+adult_test_clean$fnlwgt <- as.numeric(adult_test_clean$fnlwgt)
+adult_test_clean$education_num <- as.numeric(adult_test_clean$education_num)
+adult_test_clean$capital_gain <- as.numeric(adult_test_clean$capital_gain)
+adult_test_clean$capital_loss <- as.numeric(adult_test_clean$capital_loss)
+adult_test_clean$hours_per_week <- as.numeric(adult_test_clean$hours_per_week)
+
+# Categorical variables
+factor_cols <- c(
+  "workclass", "education", "marital_status", "occupation",
+  "relationship", "race", "sex", "native_country", "income"
+)
+
+adult_test_clean[factor_cols] <- lapply(adult_test_clean[factor_cols], factor)
+
+# Make factor levels match training data
+adult_test_clean$workclass <- factor(adult_test_clean$workclass, levels = levels(train_data$workclass))
+adult_test_clean$education <- factor(adult_test_clean$education, levels = levels(train_data$education))
+adult_test_clean$marital_status <- factor(adult_test_clean$marital_status, levels = levels(train_data$marital_status))
+adult_test_clean$occupation <- factor(adult_test_clean$occupation, levels = levels(train_data$occupation))
+adult_test_clean$relationship <- factor(adult_test_clean$relationship, levels = levels(train_data$relationship))
+adult_test_clean$race <- factor(adult_test_clean$race, levels = levels(train_data$race))
+adult_test_clean$sex <- factor(adult_test_clean$sex, levels = levels(train_data$sex))
+adult_test_clean$native_country <- factor(adult_test_clean$native_country, levels = levels(train_data$native_country))
+adult_test_clean$income <- factor(adult_test_clean$income, levels = levels(train_data$income))
+
+# Check structure
+str(adult_test_clean)
+
+# Check
+dim(adult_test_clean)
+head(adult_test_clean)
+```
+
+### 4.2.2 Predict using FINAL MODEL (Logistic)
+```{r}
+# Test Prediction (Final Model)
+test_pred <- predict(log_model, newdata = adult_test_clean)
+```
+### 4.2.3 Model Confusion Matrix on Test Data
+```{r}
+# Test Confusion Matrix
+conf_matrix_test <- confusionMatrix(test_pred, adult_test_clean$income)
+conf_matrix_test
+```
+### 4.2.4 Model Accuracy on Test Data
+```{r}
+# Test Accuracy
+test_accuracy <- round(mean(test_pred == adult_test_clean$income), 4)
+test_accuracy
+
+# Extract full confusion matrix
+cm_test <- confusionMatrix(test_pred, adult_test_clean$income)
+
+# Accuracy
+test_accuracy <- round(cm_test$overall["Accuracy"], 4)
+
+# Precision
+test_precision <- round(cm_test$byClass["Pos Pred Value"], 4)
+
+# Recall (Sensitivity)
+test_recall <- round(cm_test$byClass["Sensitivity"], 4)
+
+# F1 Score
+test_f1 <- round(2 * (test_precision * test_recall) / (test_precision + test_recall), 4)
+
+# Create table
+test_performance <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall", "F1 Score"),
+  Value = c(test_accuracy, test_precision, test_recall, test_f1)
+)
+
+test_performance
+```
+
+
+
